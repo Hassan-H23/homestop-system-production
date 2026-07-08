@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import "@mantine/core/styles.css";
+import { ColorSchemeScript, MantineProvider, mantineHtmlProps } from "@mantine/core";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -12,8 +14,13 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
-      <body>{children}</body>
+    <html lang="ar" {...mantineHtmlProps}>
+      <head>
+        <ColorSchemeScript defaultColorScheme="light" />
+      </head>
+      <body>
+        <MantineProvider defaultColorScheme="light">{children}</MantineProvider>
+      </body>
     </html>
   );
 }

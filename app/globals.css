@@ -1,1 +1,64 @@
 @import "tailwindcss";
+
+.mantine-menu-list {
+  display: flex;
+  min-width: 190px;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.mantine-menu-item {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 8px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: #182026;
+  cursor: pointer;
+  font: inherit;
+  padding: 8px 10px;
+  text-align: inherit;
+}
+
+.mantine-menu-item:hover {
+  background: #f1f5f9;
+}
+
+[class*="tablePanel"] {
+  border-color: var(--mantine-color-gray-3) !important;
+  border-radius: var(--mantine-radius-md) !important;
+  box-shadow: var(--mantine-shadow-xs);
+}
+
+[class*="dataTable"] {
+  border-collapse: separate !important;
+  border-spacing: 0 !important;
+  font-size: var(--mantine-font-size-sm);
+}
+
+[class*="dataTable"] th {
+  background: var(--mantine-color-gray-0) !important;
+  color: var(--mantine-color-gray-7) !important;
+  font-weight: 700 !important;
+}
+
+[class*="dataTable"] th,
+[class*="dataTable"] td {
+  border-bottom-color: var(--mantine-color-gray-2) !important;
+}
+
+  [class*="dataTable"] tbody tr:hover {
+    background: var(--mantine-color-blue-0) !important;
+  }
+
+@media (max-width: 640px) {
+  [class*="dataTable"] {
+    border-spacing: 0 18px !important;
+  }
+
+  [class*="dataTable"] tbody tr {
+    margin-bottom: 18px;
+  }
+}

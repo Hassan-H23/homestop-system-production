@@ -1,0 +1,633 @@
+.pageShell {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+  width: min(100%, calc(100vw - 32px));
+  box-sizing: border-box;
+  margin-inline: auto;
+}
+
+.inventoryCard {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+  direction: rtl;
+  padding: 20px;
+}
+
+.header {
+  text-align: right;
+}
+
+.headerTop {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.headerControls {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.headerTitle {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px;
+}
+
+.title {
+  margin: 0;
+}
+
+.headerDescription {
+  color: #5f6b7c;
+  line-height: 1.6;
+  margin: 8px 0 0;
+}
+
+.statsRow {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+  width: 100%;
+}
+
+.statCard {
+  padding: 18px;
+  border-radius: 8px;
+}
+
+.statContent {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.textContainer {
+  display: flex;
+  flex-direction: column;
+  text-align: right;
+  min-width: 0;
+}
+
+.statTitle {
+  font-size: 14px;
+  font-weight: 700;
+  color: #5f6b7c;
+}
+
+.statNumber {
+  font-size: 32px;
+  font-weight: 800;
+  line-height: 1.1;
+  color: #182026;
+  margin: 4px 0;
+}
+
+.statSubtitle {
+  font-size: 13px;
+  color: #5f6b7c;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.iconContainer,
+.warningIconContainer,
+.categoryIconContainer,
+.dangerIconContainer {
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.iconContainer {
+  background: #eef4ff;
+  color: #2d72d9;
+}
+
+.warningIconContainer {
+  background: #fff4e8;
+  color: #d9822b;
+}
+
+.categoryIconContainer {
+  background: #edf7f2;
+  color: #238551;
+}
+
+.dangerIconContainer {
+  background: #ffecee;
+  color: #c23030;
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.searchField {
+  min-width: 260px;
+}
+
+.quantityFilters {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.quantityInput {
+  width: 124px;
+}
+
+.reorderSwitch {
+  margin: 0;
+  min-height: 30px;
+}
+
+.clearFiltersButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.filterCount {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: #2d72d9;
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.tablePanel {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 100%;
+  border: 1px solid #d8e1e8;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #ffffff;
+}
+
+.tableScroll {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.dataTable {
+  width: 100%;
+  min-width: 980px;
+  table-layout: fixed;
+  border-collapse: collapse;
+  direction: rtl;
+  text-align: right;
+}
+
+.dataTable th,
+.dataTable td {
+  height: 54px;
+  padding: 8px 10px;
+  border-bottom: 1px solid #edf1f5;
+  vertical-align: middle;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dataTable th {
+  height: 44px;
+  background: #f6f8fa;
+  color: #5f6b7c;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.dataTable tbody tr:hover {
+  background: #f9fbfd;
+}
+
+.dataTable th:nth-child(1),
+.dataTable td:nth-child(1) {
+  width: 14%;
+  overflow: visible;
+}
+
+.dataTable th:nth-child(2),
+.dataTable td:nth-child(2) {
+  width: 16%;
+  direction: ltr;
+  text-align: left;
+}
+
+.dataTable th:nth-child(3),
+.dataTable td:nth-child(3) {
+  width: 8%;
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  background: inherit;
+  text-align: center;
+}
+
+.dataTable th:nth-child(3) {
+  z-index: 2;
+  background: #f6f8fa;
+}
+
+.dataTable th:nth-child(4),
+.dataTable td:nth-child(4) {
+  width: 20%;
+}
+
+.dataTable th:nth-child(5),
+.dataTable td:nth-child(5),
+.dataTable th:nth-child(6),
+.dataTable td:nth-child(6),
+.dataTable th:nth-child(7),
+.dataTable td:nth-child(7),
+.dataTable th:nth-child(8),
+.dataTable td:nth-child(8) {
+  width: 12%;
+}
+
+.resourceName {
+  font-weight: 700;
+  color: #182026;
+}
+
+.statusBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  max-width: 122px;
+  height: 30px;
+  padding: 0 10px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.statusSuccess {
+  background: #e5f5ec;
+  border-color: #acd9c0;
+  color: #1c6b3b;
+}
+
+.statusWarning {
+  background: #fff3df;
+  border-color: #f0c98f;
+  color: #935610;
+}
+
+.statusDanger {
+  background: #fde8ea;
+  border-color: #e9a6ad;
+  color: #a82a35;
+}
+
+.emptyState {
+  padding: 24px;
+  text-align: center;
+  color: #5f6b7c;
+}
+
+.tableFooter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 0 16px 16px;
+  color: #5f6b7c;
+  font-size: 14px;
+}
+
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  direction: rtl;
+}
+
+.pageButtons {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pageButtons :global(.mantine-Button-root) {
+  min-width: 34px;
+}
+
+.modalOverlay {
+  position: static;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.modalCard {
+  width: min(520px, 100%);
+  padding: 28px;
+  direction: rtl;
+  text-align: right;
+}
+
+.prototypeModalCard {
+  width: min(420px, 100%);
+  padding: 24px;
+  direction: rtl;
+  text-align: right;
+}
+
+.prototypeDescription {
+  color: #5f6b7c;
+  line-height: 1.7;
+  margin: 12px 0 18px;
+}
+
+.modalHeader {
+  padding-bottom: 18px;
+  border-bottom: 1px solid #d8e1e8;
+}
+
+.modalTitleBlock {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.modalTitle {
+  margin: 0;
+}
+
+.modalStatusBadge {
+  width: fit-content;
+  max-width: 100%;
+}
+
+.modalDetails {
+  display: grid;
+  gap: 10px;
+  padding: 20px 0;
+}
+
+.modalDetails p {
+  margin: 0;
+}
+
+.modalActions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: flex-start;
+  padding-top: 4px;
+}
+
+@media (max-width: 1100px) {
+  .statsRow {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 900px) {
+  .pageShell {
+    width: 100%;
+  }
+
+  .headerTop {
+    flex-direction: column;
+  }
+
+  .headerControls {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+
+  .headerControls :global(.mantine-Popover-target),
+  .headerControls :global(.mantine-Button-root) {
+    width: 100%;
+  }
+
+  .tableFooter {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .pagination {
+    flex-wrap: wrap;
+  }
+}
+
+@media (max-width: 640px) {
+  .inventoryCard {
+    gap: 20px;
+    padding: 14px;
+  }
+
+  .statsRow {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .statCard {
+    padding: 14px;
+  }
+
+  .statNumber {
+    font-size: 28px;
+  }
+
+  .toolbar,
+  .toolbar :global(.mantine-Popover-target),
+  .toolbar :global(.mantine-Button-root) {
+    width: 100%;
+  }
+
+  .searchField,
+  .quantityFilters,
+  .quantityInput {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .quantityFilters {
+    flex-direction: column;
+  }
+
+  .reorderSwitch {
+    width: 100%;
+  }
+
+  .tablePanel {
+    border: 0;
+    background: transparent;
+    gap: 12px;
+  }
+
+  .tableScroll {
+    overflow-x: visible;
+  }
+
+  .dataTable,
+  .dataTable thead,
+  .dataTable tbody,
+  .dataTable tr,
+  .dataTable th,
+  .dataTable td {
+    display: block;
+    width: 100%;
+  }
+
+  .dataTable {
+    min-width: 0;
+    border-collapse: separate;
+    border-spacing: 0 12px;
+  }
+
+  .dataTable thead {
+    display: none;
+  }
+
+  .dataTable tbody tr {
+    border: 1px solid #d8e1e8;
+    border-radius: 8px;
+    overflow: hidden;
+    background: #ffffff;
+  }
+
+  .dataTable tbody tr:hover {
+    background: #ffffff;
+  }
+
+  .dataTable td,
+  .dataTable td:nth-child(n) {
+    display: grid;
+    grid-template-columns: 96px minmax(0, 1fr);
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    min-height: 48px;
+    height: auto;
+    padding: 10px 12px;
+    border-bottom: 1px solid #edf1f5;
+    direction: rtl;
+    text-align: right;
+    white-space: normal;
+    overflow: visible;
+  }
+
+  .dataTable td:last-child {
+    border-bottom: 0;
+  }
+
+  .dataTable td::before {
+    color: #5f6b7c;
+    font-size: 12px;
+    font-weight: 700;
+  }
+
+  .dataTable td:nth-child(1)::before {
+    content: "الحالة";
+  }
+
+  .dataTable td:nth-child(2)::before {
+    content: "Barcode";
+  }
+
+  .dataTable td:nth-child(3)::before {
+    content: "نوع الخام";
+  }
+
+  .dataTable td:nth-child(4)::before {
+    content: "الفئة";
+  }
+
+  .dataTable td:nth-child(5)::before {
+    content: "الكمية";
+  }
+
+  .dataTable td:nth-child(6)::before {
+    content: "الحد الأدنى";
+  }
+
+  .dataTable td:nth-child(7)::before {
+    content: "الحد الأقصى";
+  }
+
+  .dataTable td:nth-child(3)::before {
+    content: "عرض";
+  }
+
+  .dataTable td:nth-child(4)::before {
+    content: "نوع الخام";
+  }
+
+  .dataTable td:nth-child(5)::before {
+    content: "الفئة";
+  }
+
+  .dataTable td:nth-child(6)::before {
+    content: "الكمية";
+  }
+
+  .dataTable td:nth-child(7)::before {
+    content: "الحد الأدنى";
+  }
+
+  .dataTable td:nth-child(8)::before {
+    content: "الحد الأقصى";
+  }
+
+  .statusBadge {
+    width: fit-content;
+    max-width: 100%;
+  }
+
+  .tableFooter {
+    padding: 0;
+  }
+
+  .pageButtons {
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .modalOverlay {
+    align-items: flex-end;
+    padding: 12px;
+  }
+
+  .modalCard {
+    max-height: calc(100vh - 24px);
+    overflow-y: auto;
+    padding: 18px;
+  }
+}
