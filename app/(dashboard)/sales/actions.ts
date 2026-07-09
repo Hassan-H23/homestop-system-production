@@ -2,7 +2,6 @@
 
 import { auth, currentUser } from "@clerk/nextjs/server";
 import { revalidatePath } from "next/cache";
-import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 
 type DiscountType = "percentage" | "fixed" | null;
@@ -57,7 +56,11 @@ function cleanText(value?: string) {
 }
 
 async function makeCustomBarcode(
-  tx: Prisma.TransactionClient,
+  tx: {
+    product: {
+      findUnique: typeof prisma.product.findUnique;
+    };
+  },
   originalBarcode: string,
 ) {
   for (let attempt = 0; attempt < 5; attempt += 1) {
