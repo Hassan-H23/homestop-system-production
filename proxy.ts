@@ -1,7 +1,6 @@
 import { clerkMiddleware } from "@clerk/nextjs/server";
 
 const protectedRoutes = [
-  "/",
   "/dashboard",
   "/employees",
   "/orders",

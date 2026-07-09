@@ -1,10 +1,5 @@
 "use client";
 
-import {
-  BrowserCodeReader,
-  BrowserMultiFormatReader,
-  type IScannerControls,
-} from "@zxing/browser";
 import { Button, Dialog, H1, H3, Icon, InputGroup } from "@/app/components/mantine-ui";
 import Image from "next/image";
 import Link from "next/link";
@@ -14,7 +9,7 @@ import { createSalesOrder } from "./actions";
 import styles from "./sales.module.css";
 
 type SalesMode = "overview" | "lookup" | "new-order";
-type OrderStep = "select" | "details" | "customize" | "overview";
+type OrderStep = "select" | "details" | "customize" | "custom-product" | "overview";
 type DiscountType = "percentage" | "fixed" | null;
 type SalesOrderStatus =
   | "PENDING"
@@ -34,9 +29,23 @@ type CleanModification = {
   price: number;
 };
 
+type CleanCustomProduct = {
+  name: string;
+  category: string;
+  salePrice: number;
+  material?: string;
+  dimensions?: string;
+  imageUrl?: string;
+  details?: string;
+};
+
 type DraftItem = {
   id: string;
-  product: SalesProduct;
+  kind: "existing" | "fullyCustom";
+  product?: SalesProduct;
+  customProduct?: CleanCustomProduct;
+  displayName: string;
+  displayBarcode?: string;
   quantity: number;
   sellingPrice: number;
   modifications: CleanModification[];
@@ -136,11 +145,14 @@ function parsePositiveNumber(value: string, fallback = 0) {
 
 function getCleanModifications(modifications: ModificationDraft[]) {
   return modifications
+    .filter(
+      (modification) =>
+        modification.name.trim().length > 0 || modification.price.trim().length > 0,
+    )
     .map((modification) => ({
       name: modification.name.trim(),
       price: parsePositiveNumber(modification.price),
-    }))
-    .filter((modification) => modification.name.length > 0 && modification.price > 0);
+    }));
 }
 
 function getModificationTotal(modifications: CleanModification[]) {
@@ -148,7 +160,7 @@ function getModificationTotal(modifications: CleanModification[]) {
 }
 
 function getItemUnitTotal(item: DraftItem) {
-  return item.sellingPrice + getModificationTotal(item.modifications);
+  return item.sellingPrice;
 }
 
 function getItemTotal(item: DraftItem) {
@@ -202,6 +214,12 @@ export function SalesModule({
   const [orderStep, setOrderStep] = useState<OrderStep>("select");
   const [query, setQuery] = useState("");
   const [selectedProduct, setSelectedProduct] = useState<SalesProduct | null>(null);
+  const [customProductName, setCustomProductName] = useState("");
+  const [customProductCategory, setCustomProductCategory] = useState("");
+  const [customProductMaterial, setCustomProductMaterial] = useState("");
+  const [customProductDimensions, setCustomProductDimensions] = useState("");
+  const [customProductImageUrl, setCustomProductImageUrl] = useState("");
+  const [customProductDetails, setCustomProductDetails] = useState("");
   const [lookupDetailOpen, setLookupDetailOpen] = useState(false);
   const [quantity, setQuantity] = useState("1");
   const [sellingPrice, setSellingPrice] = useState("");
@@ -228,8 +246,10 @@ export function SalesModule({
   const [scannerMessage, setScannerMessage] = useState(
     "افتح الكاميرا لمسح الباركود أو أدخل الرقم يدويًا.",
   );
-  const videoRef = useRef<HTMLVideoElement | null>(null);
-  const scannerControlsRef = useRef<IScannerControls | null>(null);
+  const scannerRef = useRef<{
+    stop: () => Promise<void>;
+    clear: () => void;
+  } | null>(null);
   const [isFinalizing, setIsFinalizing] = useState(false);
 
   const filteredProducts = useMemo(
@@ -256,24 +276,27 @@ export function SalesModule({
     selectedProduct?.salePrice ?? 0,
   );
   const currentQuantity = Math.max(1, Math.floor(parsePositiveNumber(quantity, 1)));
-  const currentItemTotal =
-    (currentSellingPrice + getModificationTotal(currentModifications)) *
-    currentQuantity;
+  const currentItemTotal = currentSellingPrice * currentQuantity;
   const showHero = mode === "overview";
 
   useEffect(() => {
     const pendingToast = window.sessionStorage.getItem("sales-order-toast");
-
-    if (pendingToast) {
-      window.sessionStorage.removeItem("sales-order-toast");
-      setToast({
-        type: "success",
-        message: pendingToast,
-      });
-    }
+    const toastTimeout = pendingToast
+      ? window.setTimeout(() => {
+          window.sessionStorage.removeItem("sales-order-toast");
+          setToast({
+            type: "success",
+            message: pendingToast,
+          });
+        }, 0)
+      : null;
 
     return () => {
-      scannerControlsRef.current?.stop();
+      if (toastTimeout !== null) {
+        window.clearTimeout(toastTimeout);
+      }
+
+      void stopScanner();
     };
   }, []);
 
@@ -296,11 +319,36 @@ export function SalesModule({
     setModifications([createModification()]);
   };
 
-  const stopScanner = () => {
-    scannerControlsRef.current?.stop();
-    scannerControlsRef.current = null;
-    setScannerActive(false);
+  const resetCustomProduct = () => {
+    setCustomProductName("");
+    setCustomProductCategory("");
+    setCustomProductMaterial("");
+    setCustomProductDimensions("");
+    setCustomProductImageUrl("");
+    setCustomProductDetails("");
   };
+
+  const startFullyCustomProduct = () => {
+    resetDraftProduct();
+    resetCustomProduct();
+    setOrderStep("custom-product");
+  };
+
+  async function stopScanner() {
+    const scanner = scannerRef.current;
+    scannerRef.current = null;
+
+    if (scanner) {
+      try {
+        await scanner.stop();
+        scanner.clear();
+      } catch {
+        // The scanner can already be stopped while navigating or restarting.
+      }
+    }
+
+    setScannerActive(false);
+  }
 
   const selectProduct = (product: SalesProduct) => {
     setSelectedProduct(product);
@@ -309,61 +357,11 @@ export function SalesModule({
     setItemNote("");
     setEditingItemId(null);
     setModifications([createModification()]);
+    resetCustomProduct();
     setOrderStep(mode === "new-order" ? "details" : "select");
 
     if (mode === "lookup") {
       setLookupDetailOpen(true);
-    }
-  };
-
-  const startScanner = async () => {
-    if (!videoRef.current) {
-      return;
-    }
-
-    if (typeof window !== "undefined" && !window.isSecureContext) {
-      setScannerMessage(
-        "الكاميرا لا تعمل من الهاتف عبر HTTP. افتح الصفحة عبر HTTPS أو استخدم إدخال الباركود يدويًا.",
-      );
-      return;
-    }
-
-    try {
-      setScannerMessage("جاري تشغيل الكاميرا...");
-      setScannerActive(true);
-      const devices = await BrowserCodeReader.listVideoInputDevices();
-      const preferredDevice =
-        devices.find((device) => /back|rear|environment/i.test(device.label)) ??
-        devices[0];
-      const reader = new BrowserMultiFormatReader();
-      scannerControlsRef.current = await reader.decodeFromVideoDevice(
-        preferredDevice?.deviceId,
-        videoRef.current,
-        (result) => {
-          const barcode = result?.getText();
-
-          if (!barcode) {
-            return;
-          }
-
-          setQuery(barcode);
-          const product = products.find((item) => item.barcode === barcode);
-
-          if (product) {
-            selectProduct(product);
-            stopScanner();
-            setScannerMessage("تم العثور على المنتج من الباركود.");
-          } else {
-            setScannerMessage("تمت قراءة الباركود، لكن لا يوجد منتج مطابق.");
-          }
-        },
-      );
-      setScannerMessage("وجه الكاميرا نحو الباركود.");
-    } catch {
-      stopScanner();
-      setScannerMessage(
-        "تعذر تشغيل الكاميرا على هذا الجهاز. استخدم البحث أو إدخال الباركود يدويًا.",
-      );
     }
   };
 
@@ -381,37 +379,94 @@ export function SalesModule({
     );
   };
 
-  const addCurrentItemToCart = () => {
-    if (!selectedProduct) {
-      return;
-    }
-
-    const draftItem: DraftItem = {
-      id: editingItemId ?? createId(),
-      product: selectedProduct,
-      quantity: currentQuantity,
-      sellingPrice: currentSellingPrice,
-      modifications: currentModifications,
-      itemNote: itemNote.trim(),
-    };
-
+  const saveDraftItem = (draftItem: DraftItem) => {
     setCart((current) =>
       editingItemId
         ? current.map((item) => (item.id === editingItemId ? draftItem : item))
         : [...current, draftItem],
     );
     resetDraftProduct();
+    resetCustomProduct();
     setOrderStep("overview");
   };
 
+  const addCurrentItemToCart = () => {
+    if (!selectedProduct) {
+      return;
+    }
+
+    saveDraftItem({
+      id: editingItemId ?? createId(),
+      kind: "existing",
+      product: selectedProduct,
+      displayName: selectedProduct.name,
+      displayBarcode: selectedProduct.barcode,
+      quantity: currentQuantity,
+      sellingPrice: currentSellingPrice,
+      modifications: currentModifications,
+      itemNote: itemNote.trim(),
+    });
+  };
+
+  const addFullyCustomItemToCart = () => {
+    const name = customProductName.trim();
+    const category = customProductCategory.trim();
+    const salePrice = parsePositiveNumber(sellingPrice);
+
+    if (!name) {
+      setToast({ type: "error", message: "اسم المنتج المخصص مطلوب." });
+      return;
+    }
+
+    if (!category) {
+      setToast({ type: "error", message: "فئة المنتج المخصص مطلوبة." });
+      return;
+    }
+
+    saveDraftItem({
+      id: editingItemId ?? createId(),
+      kind: "fullyCustom",
+      displayName: name,
+      quantity: currentQuantity,
+      sellingPrice: currentSellingPrice,
+      modifications: currentModifications,
+      itemNote: itemNote.trim(),
+      customProduct: {
+        name,
+        category,
+        salePrice,
+        material: customProductMaterial.trim() || undefined,
+        dimensions: customProductDimensions.trim() || undefined,
+        imageUrl: customProductImageUrl.trim() || undefined,
+        details: customProductDetails.trim() || undefined,
+      },
+    });
+  };
+
   const editItem = (item: DraftItem) => {
-    setSelectedProduct(item.product);
     setQuantity(String(item.quantity));
     setSellingPrice(String(item.sellingPrice));
     setItemNote(item.itemNote);
     setModifications(makeModificationDrafts(item.modifications));
     setEditingItemId(item.id);
-    setOrderStep("customize");
+
+    if (item.kind === "fullyCustom" && item.customProduct) {
+      setSelectedProduct(null);
+      setCustomProductName(item.customProduct.name);
+      setCustomProductCategory(item.customProduct.category);
+      setCustomProductMaterial(item.customProduct.material ?? "");
+      setCustomProductDimensions(item.customProduct.dimensions ?? "");
+      setCustomProductImageUrl(item.customProduct.imageUrl ?? "");
+      setCustomProductDetails(item.customProduct.details ?? "");
+      setOrderStep("custom-product");
+      return;
+    }
+
+    if (item.product) {
+      resetCustomProduct();
+      setSelectedProduct(item.product);
+      setOrderStep("customize");
+    }
   };
 
   const finalizeOrder = async () => {
@@ -443,14 +498,31 @@ export function SalesModule({
         discountType,
         discountValue: numericDiscountValue,
         manualTotalOverride: manualTotal,
-        items: cart.map((item) => ({
-          productId: item.product.product_id,
-          quantity: item.quantity,
-          sellingPrice: item.sellingPrice,
-          productName: item.product.name,
-          modifications: item.modifications,
-          itemNote: item.itemNote,
-        })),
+        items: cart.map((item) => {
+          if (item.kind === "fullyCustom" && item.customProduct) {
+            return {
+              kind: "fullyCustom" as const,
+              quantity: item.quantity,
+              sellingPrice: item.sellingPrice,
+              modifications: item.modifications,
+              itemNote: item.itemNote,
+              customProduct: item.customProduct,
+            };
+          }
+
+          if (!item.product) {
+            throw new Error("Selected product is missing from the order item.");
+          }
+
+          return {
+            kind: "existing" as const,
+            productId: item.product.product_id,
+            quantity: item.quantity,
+            sellingPrice: item.sellingPrice,
+            modifications: item.modifications,
+            itemNote: item.itemNote,
+          };
+        }),
       });
 
       setCart([]);
@@ -465,7 +537,7 @@ export function SalesModule({
       setManualTotalOverride("");
       window.sessionStorage.setItem(
         "sales-order-toast",
-        `تم إنشاء الطلب بنجاح: ${result.orderNumber}`,
+        `${result.message}: ${result.orderNumber}`,
       );
       router.push("/sales");
       router.refresh();
@@ -479,6 +551,84 @@ export function SalesModule({
       });
     } finally {
       setIsFinalizing(false);
+    }
+  };
+
+  const startImprovedScanner = async () => {
+    if (typeof window !== "undefined" && !window.isSecureContext) {
+      setScannerMessage("Camera scanning needs HTTPS on mobile.");
+      setToast({
+        type: "error",
+        message: "Camera scanning needs HTTPS on mobile.",
+      });
+      return;
+    }
+
+    try {
+      const { Html5Qrcode, Html5QrcodeSupportedFormats } = await import(
+        "html5-qrcode"
+      );
+
+      setScannerMessage("Starting camera scanner...");
+      setScannerActive(true);
+
+      const scanner = new Html5Qrcode("sales-barcode-reader", {
+        verbose: false,
+        formatsToSupport: [
+          Html5QrcodeSupportedFormats.CODE_128,
+          Html5QrcodeSupportedFormats.CODE_39,
+          Html5QrcodeSupportedFormats.EAN_13,
+          Html5QrcodeSupportedFormats.EAN_8,
+          Html5QrcodeSupportedFormats.UPC_A,
+          Html5QrcodeSupportedFormats.UPC_E,
+          Html5QrcodeSupportedFormats.ITF,
+        ],
+      });
+      scannerRef.current = scanner;
+
+      await scanner.start(
+        { facingMode: "environment" },
+        {
+          fps: 12,
+          qrbox: (viewfinderWidth, viewfinderHeight) => ({
+            width: Math.floor(Math.min(viewfinderWidth * 0.92, 460)),
+            height: Math.floor(Math.min(viewfinderHeight * 0.32, 180)),
+          }),
+        },
+        (decodedText) => {
+          const barcode = decodedText.trim();
+          const product = products.find((item) => item.barcode === barcode);
+
+          setQuery(barcode);
+
+          if (!product) {
+            setScannerMessage(`Barcode was scanned, but no product matched: ${barcode}`);
+            setToast({
+              type: "error",
+              message: `No product found for barcode: ${barcode}`,
+            });
+            return;
+          }
+
+          selectProduct(product);
+          void stopScanner();
+          setScannerMessage("Product found from barcode.");
+          setToast({
+            type: "success",
+            message: `Found product: ${product.name}`,
+          });
+        },
+        () => {},
+      );
+
+      setScannerMessage("Point the camera at the barcode inside the scan box.");
+    } catch {
+      void stopScanner();
+      setScannerMessage("Could not start the camera scanner.");
+      setToast({
+        type: "error",
+        message: "Could not start the camera scanner. Check camera permission.",
+      });
     }
   };
 
@@ -497,20 +647,20 @@ export function SalesModule({
           <Button
             icon={scannerActive ? "stop" : "camera"}
             intent={scannerActive ? "danger" : "primary"}
-            onClick={scannerActive ? stopScanner : startScanner}
+            onClick={scannerActive ? () => void stopScanner() : startImprovedScanner}
           >
             {scannerActive ? "إيقاف المسح" : "مسح بالكاميرا"}
           </Button>
+          {mode === "new-order" && (
+            <Button icon="plus" intent="success" onClick={startFullyCustomProduct}>
+              منتج مخصص
+            </Button>
+          )}
         </div>
 
         <div className={styles.scannerBox}>
-          <video
-            ref={videoRef}
-            className={styles.video}
-            muted
-            playsInline
-            aria-label="كاميرا مسح الباركود"
-          />
+          <div id="sales-barcode-reader" className={styles.video} />
+
           <div className={styles.scannerActions}>
             <span className={styles.muted}>{scannerMessage}</span>
             {query && (
@@ -715,7 +865,7 @@ export function SalesModule({
               <strong>{formatCurrency(currentSellingPrice)}</strong>
             </div>
             <div className={styles.priceRow}>
-              <span>إجمالي التعديلات</span>
+              <span>إجمالي التعديلات المسجلة</span>
               <strong>{formatCurrency(getModificationTotal(currentModifications))}</strong>
             </div>
             <div className={styles.priceRow}>
@@ -741,6 +891,145 @@ export function SalesModule({
     );
   };
 
+  const renderCustomProduct = () => (
+    <section className={styles.panel}>
+      <div className={styles.stack}>
+        <div>
+          <h2 className={styles.sectionTitle}>
+            {editingItemId ? "تعديل المنتج المخصص" : "إنشاء منتج مخصص"}
+          </h2>
+          <p className={styles.muted}>
+            المنتج المخصص سيحصل على باركود رقمي تلقائي وسيتم إضافته كمنتج جديد داخل الطلب.
+          </p>
+        </div>
+
+        <div className={styles.formGrid}>
+          <InputGroup
+            placeholder="اسم المنتج المخصص *"
+            value={customProductName}
+            onValueChange={setCustomProductName}
+          />
+          <InputGroup
+            placeholder="الفئة *"
+            value={customProductCategory}
+            onValueChange={setCustomProductCategory}
+          />
+          <InputGroup
+            leftIcon="dollar"
+            min={0}
+            placeholder="سعر البيع *"
+            type="number"
+            value={sellingPrice}
+            onValueChange={setSellingPrice}
+          />
+          <InputGroup
+            leftIcon="numerical"
+            min={1}
+            placeholder="الكمية"
+            type="number"
+            value={quantity}
+            onValueChange={setQuantity}
+          />
+          <InputGroup
+            placeholder="الخامة"
+            value={customProductMaterial}
+            onValueChange={setCustomProductMaterial}
+          />
+          <InputGroup
+            placeholder="الأبعاد"
+            value={customProductDimensions}
+            onValueChange={setCustomProductDimensions}
+          />
+          <InputGroup
+            placeholder="رابط الصورة"
+            value={customProductImageUrl}
+            onValueChange={setCustomProductImageUrl}
+          />
+          <InputGroup
+            placeholder="تفاصيل إضافية"
+            value={customProductDetails}
+            onValueChange={setCustomProductDetails}
+          />
+        </div>
+
+        <div className={styles.modsTable}>
+          {modifications.map((modification) => (
+            <div key={modification.id} className={styles.modRow}>
+              <InputGroup
+                placeholder="اسم التعديل"
+                value={modification.name}
+                onValueChange={(value) =>
+                  updateModification(modification.id, "name", value)
+                }
+              />
+              <InputGroup
+                leftIcon="numerical"
+                min={0}
+                placeholder="السعر الإضافي"
+                type="number"
+                value={modification.price}
+                onValueChange={(value) =>
+                  updateModification(modification.id, "price", value)
+                }
+              />
+              <Button
+                aria-label="حذف التعديل"
+                icon="trash"
+                minimal
+                intent="danger"
+                disabled={modifications.length === 1}
+                onClick={() =>
+                  setModifications((current) =>
+                    current.filter((item) => item.id !== modification.id),
+                  )
+                }
+              />
+            </div>
+          ))}
+        </div>
+
+        <Button
+          icon="plus"
+          onClick={() =>
+            setModifications((current) => [...current, createModification()])
+          }
+        >
+          إضافة تعديل
+        </Button>
+
+        <InputGroup
+          placeholder="ملاحظة على المنتج داخل الطلب"
+          value={itemNote}
+          onValueChange={setItemNote}
+          fill
+        />
+
+        <div className={styles.priceBreakdown}>
+          <div className={styles.priceRow}>
+            <span>سعر البيع</span>
+            <strong>{formatCurrency(currentSellingPrice)}</strong>
+          </div>
+          <div className={styles.priceRow}>
+            <span>الكمية</span>
+            <strong>{currentQuantity}</strong>
+          </div>
+          <div className={`${styles.priceRow} ${styles.totalRow}`}>
+            <span>إجمالي المنتج</span>
+            <strong>{formatCurrency(currentItemTotal)}</strong>
+          </div>
+        </div>
+
+        <div className={styles.row}>
+          <Button icon="chevron-right" onClick={() => setOrderStep("select")}>
+            رجوع
+          </Button>
+          <Button intent="primary" icon="shopping-cart" onClick={addFullyCustomItemToCart}>
+            {editingItemId ? "حفظ التعديل" : "إضافة إلى الطلب"}
+          </Button>
+        </div>
+      </div>
+    </section>
+  );
   const renderOrderOverview = () => (
     <section className={styles.panel}>
       <div className={styles.stack}>
@@ -781,8 +1070,12 @@ export function SalesModule({
             <article key={item.id} className={styles.cartItem}>
               <div className={styles.cartItemHeader}>
                 <div className={styles.stack}>
-                  <h3 className={styles.productName}>{item.product.name}</h3>
-                  <span className={styles.barcode}>{item.product.barcode}</span>
+                  <h3 className={styles.productName}>{item.displayName}</h3>
+                  {item.displayBarcode ? (
+                    <span className={styles.barcode}>{item.displayBarcode}</span>
+                  ) : (
+                    <span className={styles.barcode}>منتج مخصص</span>
+                  )}
                   <div className={styles.meta}>
                     <span>الكمية: {item.quantity}</span>
                     <span>سعر البيع: {formatCurrency(item.sellingPrice)}</span>
@@ -915,23 +1208,29 @@ export function SalesModule({
         <h2 className={styles.sectionTitle}>طلبات المبيعات</h2>
         <div className={styles.ordersList}>
           {orders.map((order) => (
-            <article key={order.id} className={styles.orderCard}>
-              <div className={styles.orderHeader}>
-                <div>
-                  <h3 className={styles.orderNumber}>{order.id}</h3>
-                  <p className={styles.muted}>{formatOrderDate(order.createdAt)}</p>
+            <Link
+              key={order.id}
+              className={styles.orderLink}
+              href={`/sales/orders/${encodeURIComponent(order.id)}`}
+            >
+              <article className={styles.orderCard}>
+                <div className={styles.orderHeader}>
+                  <div>
+                    <h3 className={styles.orderNumber}>{order.id}</h3>
+                    <p className={styles.muted}>{formatOrderDate(order.createdAt)}</p>
+                  </div>
+                  <span className={`${styles.status} ${getStatusClass(order.status)}`}>
+                    {statusLabels[order.status]}
+                  </span>
                 </div>
-                <span className={`${styles.status} ${getStatusClass(order.status)}`}>
-                  {statusLabels[order.status]}
-                </span>
-              </div>
-              <div className={styles.meta}>
-                <span>العميل: {order.customerName}</span>
-                <span>المندوب: {order.salesperson}</span>
-                <span>{order.itemCount} منتج</span>
-                <strong>{formatCurrency(order.total)}</strong>
-              </div>
-            </article>
+                <div className={styles.meta}>
+                  <span>العميل: {order.customerName}</span>
+                  <span>المندوب: {order.salesperson}</span>
+                  <span>{order.itemCount} منتج</span>
+                  <strong>{formatCurrency(order.total)}</strong>
+                </div>
+              </article>
+            </Link>
           ))}
         </div>
       </div>
@@ -996,6 +1295,7 @@ export function SalesModule({
           {orderStep === "select" && renderProductSearch()}
           {orderStep === "details" && renderSelectedProduct()}
           {orderStep === "customize" && renderCustomization()}
+          {mode === "new-order" && orderStep === "custom-product" && renderCustomProduct()}
           {mode === "new-order" && orderStep === "overview" && renderOrderOverview()}
         </div>
       )}

@@ -20,60 +20,68 @@ export async function syncCurrentClerkUser() {
     imageUrl: user.imageUrl,
   };
 
-  const existingAppUser = email
-    ? await prisma.appUser.findFirst({
+  const appUser = await prisma.$transaction(async (tx) => {
+    const existingAppUser = email
+      ? await tx.appUser.findFirst({
+          where: {
+            OR: [{ clerkId: user.id }, { email }],
+          },
+        })
+      : await tx.appUser.findUnique({
+          where: {
+            clerkId: user.id,
+          },
+        });
+
+    const syncedAppUser = existingAppUser
+      ? await tx.appUser.update({
+          where: {
+            app_user_id: existingAppUser.app_user_id,
+          },
+          data: {
+            clerkId: user.id,
+            ...userData,
+          },
+        })
+      : await tx.appUser.upsert({
+          where: {
+            clerkId: user.id,
+          },
+          create: {
+            clerkId: user.id,
+            ...userData,
+          },
+          update: userData,
+        });
+
+    if (email) {
+      await tx.employee.upsert({
         where: {
-          OR: [{ clerkId: user.id }, { email }],
+          email,
         },
-      })
-    : await prisma.appUser.findUnique({
-        where: {
-          clerkId: user.id,
+        create: {
+          employeeCode: `CLK-${user.id}`,
+          firstName,
+          lastName,
+          nationalId: `clerk:${user.id}`,
+          phone,
+          email,
+          department: "Sales",
+          position: "Sales Employee",
+          salary: "0",
+          hireDate: new Date(),
+          notes: "Created automatically from Clerk sign-up.",
+        },
+        update: {
+          firstName,
+          lastName,
+          phone,
         },
       });
+    }
 
-  const appUser = existingAppUser
-    ? await prisma.appUser.update({
-        where: {
-          app_user_id: existingAppUser.app_user_id,
-        },
-        data: {
-          clerkId: user.id,
-          ...userData,
-        },
-      })
-    : await prisma.appUser.create({
-        data: {
-          clerkId: user.id,
-          ...userData,
-        },
-      });
-
-  if (email) {
-    await prisma.employee.upsert({
-      where: {
-        email,
-      },
-      create: {
-        employeeCode: `CLK-${user.id}`,
-        firstName,
-        lastName,
-        nationalId: `clerk:${user.id}`,
-        phone,
-        email,
-        department: "Sales",
-        position: "Sales Employee",
-        salary: "0",
-        hireDate: new Date(),
-        notes: "Created automatically from Clerk sign-up.",
-      },
-      update: {
-        firstName,
-        lastName,
-        phone,
-      },
-    });
-  }
+    return syncedAppUser;
+  });
 
   return appUser;
 }

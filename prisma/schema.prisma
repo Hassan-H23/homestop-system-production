@@ -25,21 +25,26 @@ model AppUser {
 }
 
 model Product {
-  product_id    Int      @id @default(autoincrement())
-  barcode       String   @unique
-  name          String
-  category      String
-  material      String?
-  dimensions    String?
-  imageUrl      String?
-  salePrice     Decimal  @default(0) @db.Decimal(10, 2)
-  new_item      Boolean  @default(false)
+  product_id          Int         @id @default(autoincrement())
+  barcode             String      @unique
+  name                String
+  category            String
+  material            String?
+  dimensions          String?
+  imageUrl            String?
+  salePrice           Decimal     @default(0) @db.Decimal(10, 2)
+  new_item            Boolean     @default(false)
+  productType         ProductType @default(STANDARD)
+  baseProductId       Int?
+  modificationDetails Json        @default("[]")
 
-  orderItems    OrderItem[]
-  stocks        ProductStock[]
+  baseProduct Product?  @relation("ProductVariants", fields: [baseProductId], references: [product_id])
+  variants    Product[] @relation("ProductVariants")
+  orderItems  OrderItem[]
+  stocks      ProductStock[]
 
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 
@@ -195,6 +200,12 @@ model OrderChange {
   note             String?
 
   createdAt        DateTime @default(now())
+}
+
+enum ProductType {
+  STANDARD
+  CUSTOMIZED_FROM_EXISTING
+  FULLY_CUSTOM
 }
 
 enum OrderStatus {

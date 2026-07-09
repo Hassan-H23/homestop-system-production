@@ -1,0 +1,47 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: ${POSTGRES_CONTAINER_NAME:-homestop-postgres}-dev
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-homestop_system_db}
+      POSTGRES_USER: ${POSTGRES_USER:-homestop_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-homestop_password}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - homestop-postgres-dev-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  app:
+    image: node:20-alpine
+    container_name: ${APP_CONTAINER_NAME:-homestop-app}-dev
+    restart: unless-stopped
+    working_dir: /app
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      NODE_ENV: development
+      NEXT_TELEMETRY_DISABLED: 1
+      WATCHPACK_POLLING: "true"
+      DATABASE_URL: postgresql://${POSTGRES_USER:-homestop_user}:${POSTGRES_PASSWORD:-homestop_password}@postgres:5432/${POSTGRES_DB:-homestop_system_db}
+      NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY}
+      CLERK_SECRET_KEY: ${CLERK_SECRET_KEY}
+    ports:
+      - "${APP_PORT:-3000}:3000"
+    volumes:
+      - .:/app
+      - homestop-node-modules:/app/node_modules
+      - homestop-next-cache:/app/.next
+    command: sh -c "npm install && npx prisma generate && npx prisma migrate deploy && npm run dev -- --hostname 0.0.0.0"
+
+volumes:
+  homestop-postgres-dev-data:
+  homestop-node-modules:
+  homestop-next-cache:
