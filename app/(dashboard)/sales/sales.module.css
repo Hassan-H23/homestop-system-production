@@ -54,6 +54,18 @@
   flex-wrap: wrap;
 }
 
+.inlineSummary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  border: 1px solid #acd9c0;
+  border-radius: 8px;
+  background: #e5f5ec;
+  padding: 12px 14px;
+  color: #1c6b3b;
+}
+
 .modeGrid,
 .summaryGrid,
 .productGrid {
@@ -211,6 +223,13 @@
   position: static;
 }
 
+.lookupModal {
+  width: min(620px, calc(100vw - 48px));
+  margin-inline: auto;
+  direction: rtl;
+  text-align: right;
+}
+
 .detailHeader {
   display: flex;
   gap: 14px;
@@ -250,11 +269,23 @@
   gap: 8px;
 }
 
+.formGrid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+}
+
 .modRow {
   display: grid;
   grid-template-columns: 1fr;
   gap: 10px;
   align-items: center;
+}
+
+.segmented {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
 }
 
 .cartItem,
@@ -360,6 +391,27 @@
   text-align: center;
 }
 
+.toast {
+  position: fixed;
+  z-index: 1000;
+  top: 18px;
+  right: 18px;
+  max-width: min(420px, calc(100vw - 36px));
+  border: 1px solid #acd9c0;
+  border-radius: 8px;
+  background: #e5f5ec;
+  color: #1c6b3b;
+  padding: 14px 16px;
+  box-shadow: 0 14px 36px rgba(17, 20, 24, 0.16);
+  font-weight: 800;
+}
+
+.toastError {
+  border-color: #e9a6ad;
+  background: #fde8ea;
+  color: #a82a35;
+}
+
 @media (max-width: 640px) {
   .page {
     width: 100%;
@@ -401,5 +453,33 @@
 
   .modRow {
     grid-template-columns: 1fr;
+  }
+
+  .segmented {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (min-width: 700px) {
+  .page {
+    width: min(100%, 760px);
+  }
+
+  .toolbar,
+  .formGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .modRow {
+    grid-template-columns: minmax(0, 1fr) minmax(150px, 0.5fr) auto;
+  }
+
+  .productCard {
+    grid-template-columns: 76px minmax(0, 1fr) auto;
+  }
+
+  .productCard :global(.mantine-Button-root) {
+    grid-column: auto;
+    width: auto;
   }
 }

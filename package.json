@@ -9,6 +9,7 @@
     "lint": "eslint",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
+    "db:seed": "node scripts/seed-products.cjs",
     "db:studio": "prisma studio"
   },
   "dependencies": {

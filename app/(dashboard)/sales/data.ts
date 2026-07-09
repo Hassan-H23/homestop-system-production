@@ -19,6 +19,12 @@ export async function getSalesPageData() {
         orderDate: "desc",
       },
       include: {
+        employee: {
+          select: {
+            firstName: true,
+            lastName: true,
+          },
+        },
         items: {
           select: {
             order_item_id: true,
@@ -49,8 +55,12 @@ export async function getSalesPageData() {
     orders: orders.map((order) => ({
       id: order.orderNumber,
       status: order.status,
+      customerName: order.customerName ?? "غير محدد",
+      salesperson: order.employee
+        ? `${order.employee.firstName} ${order.employee.lastName}`
+        : "غير محدد",
       itemCount: order.items.length,
-      total: Number(order.total),
+      total: Number(order.finalTotal ?? order.total),
       createdAt: order.orderDate.toISOString(),
     })),
   };

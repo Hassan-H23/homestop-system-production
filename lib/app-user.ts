@@ -13,24 +13,41 @@ export async function syncCurrentClerkUser() {
   const lastName = user.lastName ?? "User";
   const phone = user.primaryPhoneNumber?.phoneNumber ?? `clerk:${user.id}`;
 
-  const appUser = await prisma.appUser.upsert({
-    where: {
-      clerkId: user.id,
-    },
-    create: {
-      clerkId: user.id,
-      email,
-      firstName,
-      lastName,
-      imageUrl: user.imageUrl,
-    },
-    update: {
-      email,
-      firstName,
-      lastName,
-      imageUrl: user.imageUrl,
-    },
-  });
+  const userData = {
+    email,
+    firstName,
+    lastName,
+    imageUrl: user.imageUrl,
+  };
+
+  const existingAppUser = email
+    ? await prisma.appUser.findFirst({
+        where: {
+          OR: [{ clerkId: user.id }, { email }],
+        },
+      })
+    : await prisma.appUser.findUnique({
+        where: {
+          clerkId: user.id,
+        },
+      });
+
+  const appUser = existingAppUser
+    ? await prisma.appUser.update({
+        where: {
+          app_user_id: existingAppUser.app_user_id,
+        },
+        data: {
+          clerkId: user.id,
+          ...userData,
+        },
+      })
+    : await prisma.appUser.create({
+        data: {
+          clerkId: user.id,
+          ...userData,
+        },
+      });
 
   if (email) {
     await prisma.employee.upsert({

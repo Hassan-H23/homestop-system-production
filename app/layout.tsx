@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { ClerkProvider } from "@clerk/nextjs";
 import "@mantine/core/styles.css";
-import { ColorSchemeScript, MantineProvider, mantineHtmlProps } from "@mantine/core";
+import { MantineProvider, mantineHtmlProps } from "@mantine/core";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -16,9 +16,6 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="ar" {...mantineHtmlProps}>
-      <head>
-        <ColorSchemeScript defaultColorScheme="light" />
-      </head>
       <body>
         <ClerkProvider>
           <MantineProvider defaultColorScheme="light">{children}</MantineProvider>

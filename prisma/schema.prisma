@@ -33,6 +33,7 @@ model Product {
   dimensions    String?
   imageUrl      String?
   salePrice     Decimal  @default(0) @db.Decimal(10, 2)
+  new_item      Boolean  @default(false)
 
   orderItems    OrderItem[]
   stocks        ProductStock[]
@@ -73,6 +74,7 @@ model Employee {
 
   notes            String?
 
+  orders           Order[]
   orderChanges     OrderChange[]
 
   createdAt        DateTime        @default(now())
@@ -97,6 +99,15 @@ model Order {
   total           Decimal     @default(0) @db.Decimal(10, 2)
 
   notes           String?
+  employeeId      Int?
+  employee        Employee?   @relation(fields: [employeeId], references: [employee_id], onDelete: SetNull)
+
+  originalTotal        Decimal  @default(0) @db.Decimal(10, 2)
+  discountType         String?
+  discountValue        Decimal  @default(0) @db.Decimal(10, 2)
+  manualTotalOverride  Decimal? @db.Decimal(10, 2)
+  finalTotal           Decimal  @default(0) @db.Decimal(10, 2)
+  orderNote            String?
 
   items           OrderItem[]
   changes         OrderChange[]
@@ -118,6 +129,9 @@ model OrderItem {
   quantity      Int
   unitPrice     Decimal  @db.Decimal(10, 2)
   totalPrice    Decimal  @db.Decimal(10, 2)
+  sellingPrice  Decimal  @default(0) @db.Decimal(10, 2)
+  itemNote      String?
+  modifications Json     @default("[]")
 
   changes       OrderChange[]
 
