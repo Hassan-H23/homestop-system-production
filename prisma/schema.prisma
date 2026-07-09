@@ -1,0 +1,223 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Get a free hosted Postgres database in seconds: `npx create-db`
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model AppUser {
+  app_user_id  Int           @id @default(autoincrement())
+  clerkId      String        @unique
+  email        String?       @unique
+  firstName    String?
+  lastName     String?
+  imageUrl     String?
+  role         AppUserRole   @default(EMPLOYEE)
+  status       AppUserStatus @default(ACTIVE)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+}
+
+model Product {
+  product_id    Int      @id @default(autoincrement())
+  barcode       String   @unique
+  name          String
+  category      String
+  material      String?
+  dimensions    String?
+  imageUrl      String?
+  salePrice     Decimal  @default(0) @db.Decimal(10, 2)
+
+  orderItems    OrderItem[]
+  stocks        ProductStock[]
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+
+model Employee {
+  employee_id      Int             @id @default(autoincrement())
+
+  employeeCode     String          @unique
+
+  firstName        String
+  lastName         String
+
+  nationalId       String          @unique
+
+  phone            String
+  email            String          @unique
+
+  department       String
+  position         String
+
+  role             EmployeeRole    @default(SALES)
+  status           EmployeeStatus  @default(ACTIVE)
+
+  salary           Decimal         @db.Decimal(10, 2)
+
+  workLocation     String?
+
+  managerId        Int?
+  manager          Employee?       @relation("EmployeeManager", fields: [managerId], references: [employee_id])
+  subordinates     Employee[]      @relation("EmployeeManager")
+
+  hireDate         DateTime
+
+  notes            String?
+
+  orderChanges     OrderChange[]
+
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+}
+
+model Order {
+  order_id        Int         @id @default(autoincrement())
+
+  orderNumber     String      @unique
+  status          OrderStatus @default(PENDING)
+  orderDate       DateTime    @default(now())
+
+  customerName    String?
+  customerPhone   String?
+  customerEmail   String?
+  shippingAddress String?
+
+  subtotal        Decimal     @default(0) @db.Decimal(10, 2)
+  tax             Decimal     @default(0) @db.Decimal(10, 2)
+  discount        Decimal     @default(0) @db.Decimal(10, 2)
+  total           Decimal     @default(0) @db.Decimal(10, 2)
+
+  notes           String?
+
+  items           OrderItem[]
+  changes         OrderChange[]
+
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+}
+
+model OrderItem {
+  order_item_id Int      @id @default(autoincrement())
+
+  orderId       Int
+  order         Order    @relation(fields: [orderId], references: [order_id], onDelete: Cascade)
+
+  productId     Int
+  product       Product  @relation(fields: [productId], references: [product_id])
+
+  productName   String
+  quantity      Int
+  unitPrice     Decimal  @db.Decimal(10, 2)
+  totalPrice    Decimal  @db.Decimal(10, 2)
+
+  changes       OrderChange[]
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model Location {
+  location_id   Int      @id @default(autoincrement())
+
+  name          String
+  code          String   @unique
+  type          String?  // warehouse, branch, showroom, etc.
+  address       String?
+  notes         String?
+
+  productStocks ProductStock[]
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model ProductStock {
+  product_stock_id Int @id @default(autoincrement())
+
+  productId        Int
+  product          Product  @relation(fields: [productId], references: [product_id], onDelete: Cascade)
+
+  locationId       Int
+  location         Location @relation(fields: [locationId], references: [location_id], onDelete: Cascade)
+
+  currentAmount    Int      @default(0)
+  minAmount        Int      @default(0)
+  maxAmount        Int      @default(0)
+
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@unique([productId, locationId])
+}
+
+
+
+
+model OrderChange {
+  order_change_id Int @id @default(autoincrement())
+
+  orderId          Int
+  order            Order @relation(fields: [orderId], references: [order_id], onDelete: Cascade)
+
+  orderItemId      Int?
+  orderItem        OrderItem? @relation(fields: [orderItemId], references: [order_item_id], onDelete: SetNull)
+
+  employeeId       Int?
+  employee         Employee? @relation(fields: [employeeId], references: [employee_id], onDelete: SetNull)
+
+  action           OrderChangeAction
+  fieldName        String?
+  oldValue         String?
+  newValue         String?
+  note             String?
+
+  createdAt        DateTime @default(now())
+}
+
+enum OrderStatus {
+  PENDING
+  PROCESSING
+  SHIPPED
+  DELIVERED
+  CANCELLED
+}
+
+enum EmployeeRole {
+  ADMIN
+  SALES
+}
+
+enum EmployeeStatus {
+  ACTIVE
+  ON_LEAVE
+  SUSPENDED
+}
+
+enum AppUserRole {
+  ADMIN
+  MANAGER
+  EMPLOYEE
+}
+
+enum AppUserStatus {
+  ACTIVE
+  DISABLED
+}
+
+enum OrderChangeAction {
+  ORDER_CREATED
+  ORDER_UPDATED
+  ITEM_ADDED
+  ITEM_UPDATED
+  ITEM_REMOVED
+  STATUS_CHANGED
+}

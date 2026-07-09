@@ -1,5 +1,14 @@
-import { SalesModule } from "../page";
+import { SalesModule } from "../SalesModule";
+import { getSalesPageData } from "../data";
 
-export default function SalesLookupPage() {
-  return <SalesModule initialMode="lookup" />;
+export default async function SalesLookupPage() {
+  const data = await getSalesPageData();
+
+  return (
+    <SalesModule
+      initialMode="lookup"
+      products={data.products}
+      orders={data.orders}
+    />
+  );
 }

@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { ClerkProvider } from "@clerk/nextjs";
 import "@mantine/core/styles.css";
 import { ColorSchemeScript, MantineProvider, mantineHtmlProps } from "@mantine/core";
 import "./globals.css";
@@ -19,7 +20,9 @@ export default function RootLayout({
         <ColorSchemeScript defaultColorScheme="light" />
       </head>
       <body>
-        <MantineProvider defaultColorScheme="light">{children}</MantineProvider>
+        <ClerkProvider>
+          <MantineProvider defaultColorScheme="light">{children}</MantineProvider>
+        </ClerkProvider>
       </body>
     </html>
   );

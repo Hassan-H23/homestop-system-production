@@ -1,5 +1,14 @@
-import { SalesModule } from "../page";
+import { SalesModule } from "../SalesModule";
+import { getSalesPageData } from "../data";
 
-export default function NewSalesOrderPage() {
-  return <SalesModule initialMode="new-order" />;
+export default async function NewSalesOrderPage() {
+  const data = await getSalesPageData();
+
+  return (
+    <SalesModule
+      initialMode="new-order"
+      products={data.products}
+      orders={data.orders}
+    />
+  );
 }
