@@ -1,124 +1,409 @@
-# HomeStop System
+# HomeStop System Deployment Guide
 
-HomeStop System is a Next.js App Router application using TypeScript, Prisma ORM, PostgreSQL, Clerk authentication, and npm. This repository includes Docker Compose files for local development and production-style deployment on a VPS.
+HomeStop System is a Next.js App Router application using TypeScript, Prisma ORM, PostgreSQL, Clerk authentication, Node.js 20, and npm.
 
-## Prerequisites
+This repo is set up for two modes:
 
-Install these tools on your machine or VPS:
+- Production on a VPS: Docker Compose runs the Next.js app and PostgreSQL. Host Nginx proxies public traffic to the app.
+- Local development: Docker Compose can run a hot-reload development container and PostgreSQL.
 
-- Docker Engine
-- Docker Compose plugin
-- Git
+## What Runs In Production
 
-Check installation:
+Production uses these pieces:
 
-```bash
-docker --version
-docker compose version
-git --version
-```
+- `app`: the Next.js production server on internal port `3000`
+- `postgres`: PostgreSQL 16 with a persistent Docker volume
+- Host Nginx: listens on public port `80` and `443`, then proxies to `127.0.0.1:3000`
 
-## Environment Setup
+PostgreSQL is not published to the public internet. The app is bound to `127.0.0.1`, so it is reachable from the VPS itself and from Nginx, not directly from outside the server.
 
-Create your local environment file from the example:
+## Required Files
+
+- `Dockerfile`: builds the production Next.js image and generates Prisma Client
+- `docker-compose.yml`: production app and database containers
+- `docker-compose.dev.yml`: local development with hot reload
+- `docker-entrypoint.sh`: runs `prisma migrate deploy` before starting Next.js
+- `.env.example`: documents required environment variables
+- `deploy/nginx/homestop.conf`: Nginx reverse proxy template for the VPS
+
+## Environment Variables
+
+Create `.env` from the example:
 
 ```bash
 cp .env.example .env
+nano .env
 ```
 
-Update `.env` with real values:
+Required production values:
 
 ```env
 APP_CONTAINER_NAME=homestop-app
 APP_PORT=3000
+APP_NODE_MAX_OLD_SPACE_MB=768
+NODE_ENV=production
+
 POSTGRES_CONTAINER_NAME=homestop-postgres
 POSTGRES_DB=homestop_system_db
 POSTGRES_USER=homestop_user
-POSTGRES_PASSWORD=change-this-password
-POSTGRES_PORT=5432
-DATABASE_URL=postgresql://homestop_user:change-this-password@postgres:5432/homestop_system_db
-NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=your_clerk_publishable_key
-CLERK_SECRET_KEY=your_clerk_secret_key
+POSTGRES_PASSWORD=use-a-long-random-password
+
+DATABASE_URL=postgresql://homestop_user:use-a-long-random-password@postgres:5432/homestop_system_db
+
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_live_your_key
+CLERK_SECRET_KEY=sk_live_your_key
 ```
 
-When running inside Docker Compose, the app container uses the database host `postgres`, not `localhost`. The Compose files construct the runtime `DATABASE_URL` from `POSTGRES_USER`, `POSTGRES_PASSWORD`, and `POSTGRES_DB`, so an old local `DATABASE_URL` value will not accidentally point the app container at `localhost`.
+Important notes:
 
-## Production Docker
+- Do not use `localhost` in the Docker database URL. Inside Docker Compose, the database host is `postgres`.
+- Do not commit `.env` to GitHub.
+- For production, use Clerk live keys, not test keys, unless you intentionally want a test deployment.
 
-Build and start the production containers:
+## Local Production Test
+
+From the project folder:
 
 ```bash
 docker compose up -d --build
 ```
 
-Open the app:
+Check containers:
 
 ```bash
+docker compose ps
+```
+
+Check app logs:
+
+```bash
+docker compose logs -f app
+```
+
+Open locally:
+
+```text
 http://localhost:3000
 ```
 
-The app container runs Prisma migrations automatically on startup using:
+If port `3000` is busy, set this in `.env`:
 
-```bash
-npx prisma migrate deploy
+```env
+APP_PORT=3300
 ```
 
-It does not use `prisma db push`.
+Then rebuild:
 
-## Development Docker
+```bash
+docker compose up -d --build
+```
 
-For local development with hot reload:
+Open:
+
+```text
+http://localhost:3300
+```
+
+## Local Development
+
+Use this for hot reload while coding:
 
 ```bash
 docker compose -f docker-compose.dev.yml up --build
 ```
 
-The development container mounts the source code into `/app`, installs dependencies into a named Docker volume, generates Prisma Client, runs migrations, and starts Next.js dev mode on `0.0.0.0:3000`.
-
 Open:
 
-```bash
+```text
 http://localhost:3000
 ```
 
-## Stopping Containers
+The development container mounts your source code, installs dependencies into Docker volumes, generates Prisma Client, runs migrations, and starts `next dev`.
 
-Stop production containers:
+## Testing Scanner On Phone With Ngrok
 
-```bash
-docker compose down
-```
-
-Stop development containers:
+For local phone testing, start the app first:
 
 ```bash
-docker compose -f docker-compose.dev.yml down
+npm run dev
 ```
 
-Stop and remove containers plus volumes, including database data:
+In another terminal:
 
 ```bash
-docker compose down -v
+ngrok http 3000
 ```
 
-Use `down -v` carefully because it deletes the PostgreSQL Docker volume.
+Use the HTTPS URL from ngrok on your phone, for example:
 
-## Rebuilding Containers
+```text
+https://your-ngrok-domain.ngrok-free.app/sales/new-order
+```
 
-After dependency, Dockerfile, or environment changes:
+If Clerk login fails, add the ngrok URL in your Clerk dashboard under allowed origins/redirect URLs.
+
+If Next.js dev mode blocks the ngrok host, add the ngrok hostname to `allowedDevOrigins` in `next.config.ts`, then restart `npm run dev`.
+
+## Hostinger VPS Step By Step
+
+These commands assume Ubuntu on the Hostinger VPS.
+
+### 1. Point Your Domain To The VPS
+
+In your domain DNS settings, create an A record:
+
+```text
+Type: A
+Name: @
+Value: YOUR_VPS_PUBLIC_IP
+TTL: automatic
+```
+
+For `www`:
+
+```text
+Type: A
+Name: www
+Value: YOUR_VPS_PUBLIC_IP
+TTL: automatic
+```
+
+DNS can take a few minutes to a few hours.
+
+### 2. SSH Into The VPS
+
+From your computer:
+
+```bash
+ssh root@YOUR_VPS_PUBLIC_IP
+```
+
+Update the server:
+
+```bash
+apt update && apt upgrade -y
+```
+
+### 3. Install Docker And Compose
+
+```bash
+apt install -y ca-certificates curl gnupg git ufw nginx
+install -m 0755 -d /etc/apt/keyrings
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+chmod a+r /etc/apt/keyrings/docker.asc
+. /etc/os-release
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu $VERSION_CODENAME stable" > /etc/apt/sources.list.d/docker.list
+apt update
+apt install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+```
+
+Verify:
+
+```bash
+docker --version
+docker compose version
+```
+
+### 4. Configure Firewall
+
+Allow SSH, HTTP, and HTTPS:
+
+```bash
+ufw allow OpenSSH
+ufw allow 'Nginx Full'
+ufw enable
+ufw status
+```
+
+Do not open PostgreSQL port `5432` publicly.
+
+### 5. Clone The Project
+
+Use your GitHub repository URL:
+
+```bash
+cd /opt
+git clone YOUR_GITHUB_REPO_URL homestop-system-production
+cd /opt/homestop-system-production
+```
+
+### 6. Create Production `.env`
+
+```bash
+cp .env.example .env
+nano .env
+```
+
+Use strong values:
+
+```env
+APP_CONTAINER_NAME=homestop-app
+APP_PORT=3000
+APP_NODE_MAX_OLD_SPACE_MB=768
+NODE_ENV=production
+
+POSTGRES_CONTAINER_NAME=homestop-postgres
+POSTGRES_DB=homestop_system_db
+POSTGRES_USER=homestop_user
+POSTGRES_PASSWORD=PASTE_A_LONG_RANDOM_PASSWORD_HERE
+
+DATABASE_URL=postgresql://homestop_user:PASTE_A_LONG_RANDOM_PASSWORD_HERE@postgres:5432/homestop_system_db
+
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_live_your_key_here
+CLERK_SECRET_KEY=sk_live_your_key_here
+```
+
+Generate a password if needed:
+
+```bash
+openssl rand -base64 32
+```
+
+### 7. Start The Containers
 
 ```bash
 docker compose up -d --build
 ```
 
-Force a clean rebuild without cache:
+Check status:
 
 ```bash
-docker compose build --no-cache
-docker compose up -d
+docker compose ps
 ```
 
-## Logs
+Check app logs:
+
+```bash
+docker compose logs -f app
+```
+
+You should see Prisma migrations run:
+
+```text
+Running Prisma migrations...
+No pending migrations to apply.
+Starting HomeStop application...
+```
+
+If migrations fail, the app will not start. Fix the error shown in logs first.
+
+### 8. Test The App On The VPS Itself
+
+From the VPS:
+
+```bash
+curl -I http://127.0.0.1:3000
+```
+
+A redirect from Clerk is okay. A connection error means the app is not listening or the container is unhealthy.
+
+### 9. Configure Nginx Reverse Proxy
+
+Copy the provided template:
+
+```bash
+cp /opt/homestop-system-production/deploy/nginx/homestop.conf /etc/nginx/sites-available/homestop
+nano /etc/nginx/sites-available/homestop
+```
+
+Replace:
+
+```text
+YOUR_DOMAIN_OR_SERVER_IP
+```
+
+With your domain, for example:
+
+```text
+homestop.example.com
+```
+
+Enable the site:
+
+```bash
+ln -s /etc/nginx/sites-available/homestop /etc/nginx/sites-enabled/homestop
+rm -f /etc/nginx/sites-enabled/default
+nginx -t
+systemctl reload nginx
+```
+
+Open:
+
+```text
+http://your-domain.com
+```
+
+### 10. Enable HTTPS With Certbot
+
+Install Certbot:
+
+```bash
+apt install -y certbot python3-certbot-nginx
+```
+
+Issue the certificate:
+
+```bash
+certbot --nginx -d your-domain.com -d www.your-domain.com
+```
+
+If you do not use `www`, omit it:
+
+```bash
+certbot --nginx -d your-domain.com
+```
+
+Test auto-renewal:
+
+```bash
+certbot renew --dry-run
+```
+
+Now open:
+
+```text
+https://your-domain.com
+```
+
+### 11. Configure Clerk For Production
+
+In the Clerk dashboard, add your production URL to allowed origins and redirect URLs.
+
+Use:
+
+```text
+https://your-domain.com
+https://www.your-domain.com
+```
+
+If you are using Clerk test keys, configure the test instance. If you are using live keys, configure the production instance.
+
+## Future Deployments
+
+After pushing changes to GitHub, SSH into the VPS:
+
+```bash
+ssh root@YOUR_VPS_PUBLIC_IP
+cd /opt/homestop-system-production
+git pull
+docker compose up -d --build
+```
+
+This rebuilds the app image, keeps the PostgreSQL volume, and runs pending Prisma migrations automatically.
+
+Check logs after every deployment:
+
+```bash
+docker compose logs -f app
+```
+
+## Common Commands
+
+View containers:
+
+```bash
+docker compose ps
+```
 
 View all logs:
 
@@ -126,21 +411,52 @@ View all logs:
 docker compose logs -f
 ```
 
-View app logs:
+View only app logs:
 
 ```bash
 docker compose logs -f app
 ```
 
-View PostgreSQL logs:
+View only database logs:
 
 ```bash
 docker compose logs -f postgres
 ```
 
+Restart the app:
+
+```bash
+docker compose restart app
+```
+
+Restart everything:
+
+```bash
+docker compose restart
+```
+
+Stop containers:
+
+```bash
+docker compose down
+```
+
+Start existing containers:
+
+```bash
+docker compose up -d
+```
+
+Rebuild from scratch:
+
+```bash
+docker compose build --no-cache
+docker compose up -d
+```
+
 ## Prisma Commands
 
-Run migrations manually in production Compose:
+Run production migrations manually:
 
 ```bash
 docker compose exec app npx prisma migrate deploy
@@ -152,127 +468,132 @@ Generate Prisma Client manually:
 docker compose exec app npx prisma generate
 ```
 
-Open Prisma Studio locally if needed:
-
-```bash
-docker compose exec app npx prisma studio
-```
-
-## PostgreSQL Persistence
-
-Production Compose stores PostgreSQL data in the named Docker volume:
-
-```bash
-homestop-postgres-data
-```
-
-Rebuilding containers does not delete this volume. Data persists after:
-
-```bash
-docker compose down
-docker compose up -d --build
-```
-
-Data is deleted only if you remove the volume, for example:
-
-```bash
-docker compose down -v
-```
-
-## Backup PostgreSQL
-
-Create a database backup from the production Compose stack:
-
-```bash
-docker compose exec -T postgres pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" > homestop-backup.sql
-```
-
-If your shell does not expand `.env` variables automatically, use explicit values:
-
-```bash
-docker compose exec -T postgres pg_dump -U homestop_user -d homestop_system_db > homestop-backup.sql
-```
-
-## Restore PostgreSQL
-
-Restore a backup into the running PostgreSQL container:
-
-```bash
-docker compose exec -T postgres psql -U homestop_user -d homestop_system_db < homestop-backup.sql
-```
-
-For a clean restore, stop the app first so no writes happen during restore:
-
-```bash
-docker compose stop app
-docker compose exec -T postgres psql -U homestop_user -d homestop_system_db < homestop-backup.sql
-docker compose start app
-```
-
-## Hostinger VPS Deployment
-
-On the VPS, install Docker and the Compose plugin, then clone the repository:
-
-```bash
-git clone <your-github-repo-url>
-cd homestop-system-production
-cp .env.example .env
-nano .env
-```
-
-Set secure production values in `.env`. Important:
-
-```env
-POSTGRES_PASSWORD=your-secure-password
-NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=your-production-clerk-publishable-key
-CLERK_SECRET_KEY=your-production-clerk-secret-key
-```
-
-For Docker Compose, keep the internal database host as `postgres`. You normally only need to set the `POSTGRES_*` values; Compose provides the app container with the correct Prisma connection string.
-
-Start the app:
-
-```bash
-docker compose up -d --build
-```
-
-Check status:
-
-```bash
-docker compose ps
-docker compose logs -f app
-```
-
-The app will be reachable on port `3000` unless `APP_PORT` is changed. If port `3000` is already in use, set a different host port in `.env`, for example `APP_PORT=3300`.
-
-## Future Deployments From GitHub
-
-After pushing changes to GitHub, deploy updates on the VPS with:
-
-```bash
-cd homestop-system-production
-git pull
-docker compose up -d --build
-```
-
-This rebuilds the app image, starts the updated container, keeps the PostgreSQL volume, and runs pending Prisma migrations automatically through the app entrypoint.
-
-## Useful Maintenance Commands
-
-Restart the app container:
-
-```bash
-docker compose restart app
-```
-
-Run a shell inside the app container:
-
-```bash
-docker compose exec app sh
-```
-
-Run a SQL shell:
+Open database shell:
 
 ```bash
 docker compose exec postgres psql -U homestop_user -d homestop_system_db
 ```
+
+## PostgreSQL Backups
+
+Create a backup:
+
+```bash
+cd /opt/homestop-system-production
+mkdir -p backups
+docker compose exec -T postgres pg_dump -U homestop_user -d homestop_system_db > backups/homestop-$(date +%F-%H%M).sql
+```
+
+List backups:
+
+```bash
+ls -lh backups
+```
+
+Copy a backup from VPS to your computer:
+
+```bash
+scp root@YOUR_VPS_PUBLIC_IP:/opt/homestop-system-production/backups/homestop-YYYY-MM-DD-HHMM.sql .
+```
+
+## PostgreSQL Restore
+
+Upload the backup to the VPS if needed:
+
+```bash
+scp homestop-backup.sql root@YOUR_VPS_PUBLIC_IP:/opt/homestop-system-production/backups/
+```
+
+Stop the app before restoring:
+
+```bash
+cd /opt/homestop-system-production
+docker compose stop app
+docker compose exec -T postgres psql -U homestop_user -d homestop_system_db < backups/homestop-backup.sql
+docker compose start app
+```
+
+## Resource Settings For 4 GB VPS
+
+The production Compose file is tuned conservatively:
+
+- App memory limit: `1024m`
+- App Node heap: `768 MB`
+- App CPU limit: `1.0`
+- PostgreSQL memory limit: `768m`
+- PostgreSQL CPU limit: `0.75`
+- PostgreSQL `max_connections`: `50`
+- PostgreSQL `shared_buffers`: `128MB`
+- Docker log rotation: `10m` per file, `3` files
+
+This leaves memory for Ubuntu, Docker, Nginx, and build operations.
+
+During `docker compose up -d --build`, CPU and memory can temporarily rise because Next.js is compiling. That is normal. If the VPS struggles during builds, add swap.
+
+## Add Swap On Small VPS
+
+Check current swap:
+
+```bash
+free -h
+```
+
+Create a 2 GB swap file:
+
+```bash
+fallocate -l 2G /swapfile
+chmod 600 /swapfile
+mkswap /swapfile
+swapon /swapfile
+echo '/swapfile none swap sw 0 0' >> /etc/fstab
+```
+
+Verify:
+
+```bash
+free -h
+```
+
+## Debug Internal Server Error
+
+Start with logs:
+
+```bash
+cd /opt/homestop-system-production
+docker compose logs --tail=200 app
+docker compose logs --tail=200 postgres
+```
+
+Most common causes:
+
+- `DATABASE_URL` points to `localhost` instead of `postgres`
+- Wrong `POSTGRES_PASSWORD`
+- Migrations failed
+- Clerk keys are missing or from the wrong Clerk environment
+- The domain is not configured in Clerk allowed origins/redirect URLs
+- The app was rebuilt without required build-time public environment variables
+
+Check environment inside the app container without printing secrets:
+
+```bash
+docker compose exec app sh -lc 'node -e "console.log({node:process.version, db:!!process.env.DATABASE_URL, clerkPublic:!!process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY, clerkSecret:!!process.env.CLERK_SECRET_KEY})"'
+```
+
+Check Prisma migration status:
+
+```bash
+docker compose exec app npx prisma migrate status
+```
+
+Check database health:
+
+```bash
+docker compose exec postgres pg_isready -U homestop_user -d homestop_system_db
+```
+
+## Important Safety Notes
+
+- Never run `docker compose down -v` on production unless you intentionally want to delete the PostgreSQL volume.
+- Keep PostgreSQL private. Do not publish port `5432` from production Compose.
+- Keep `.env` only on the VPS and never commit it.
+- Back up before deploying database schema changes.

@@ -7,7 +7,7 @@ const nextConfig: NextConfig = {
     "700d-41-46-253-149.ngrok-free.app",
     "0143-41-46-253-149.ngrok-free.app",
     "59ad-41-46-253-149.ngrok-free.app",
-    "83d2-41-46-253-149.ngrok-free.app",
+    "73ce-197-46-204-217.ngrok-free.app",
   ],
   images: {
     remotePatterns: [

@@ -7,16 +7,33 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-homestop_system_db}
       POSTGRES_USER: ${POSTGRES_USER:-homestop_user}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-homestop_password}
-    ports:
-      - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - homestop-postgres-data:/var/lib/postgresql/data
+    command:
+      [
+        "postgres",
+        "-c",
+        "max_connections=50",
+        "-c",
+        "shared_buffers=128MB",
+        "-c",
+        "effective_cache_size=1GB",
+        "-c",
+        "work_mem=4MB",
+      ]
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 10s
       timeout: 5s
       retries: 10
       start_period: 10s
+    mem_limit: 768m
+    cpus: 0.75
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   app:
     build:
@@ -32,11 +49,27 @@ services:
     environment:
       NODE_ENV: production
       PORT: 3000
+      HOSTNAME: 0.0.0.0
+      NEXT_TELEMETRY_DISABLED: 1
+      NODE_OPTIONS: --max-old-space-size=${APP_NODE_MAX_OLD_SPACE_MB:-768}
       DATABASE_URL: postgresql://${POSTGRES_USER:-homestop_user}:${POSTGRES_PASSWORD:-homestop_password}@postgres:5432/${POSTGRES_DB:-homestop_system_db}
       NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY}
       CLERK_SECRET_KEY: ${CLERK_SECRET_KEY}
     ports:
-      - "${APP_PORT:-3000}:3000"
+      - "127.0.0.1:${APP_PORT:-3000}:3000"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3000/ >/dev/null 2>&1 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    mem_limit: 1024m
+    cpus: 1.0
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
 volumes:
   homestop-postgres-data:

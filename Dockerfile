@@ -7,7 +7,7 @@ RUN apk add --no-cache libc6-compat openssl
 
 FROM base AS deps
 COPY package.json package-lock.json ./
-RUN npm ci
+RUN npm ci && npm cache clean --force
 
 FROM base AS builder
 ARG NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
@@ -21,6 +21,8 @@ RUN npm run build
 FROM base AS runner
 ENV NODE_ENV=production
 ENV PORT=3000
+ENV HOSTNAME=0.0.0.0
+ENV NODE_OPTIONS=--max-old-space-size=768
 
 COPY package.json package-lock.json ./
 COPY --from=deps /app/node_modules ./node_modules
