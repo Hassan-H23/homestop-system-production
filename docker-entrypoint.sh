@@ -6,6 +6,10 @@ if [ -z "$DATABASE_URL" ]; then
   exit 1
 fi
 
+echo "Running Prisma Generate..."
+npx prisma generate
+
+
 echo "Running Prisma migrations..."
 npx prisma migrate deploy
 
